@@ -113,14 +113,37 @@ Observation:
 - The repository contains meaningful development commits.
 - Commit messages follow a structured format:
 
-type(scope): description
 
-Examples:
+---
 
-fix(ui): ...
-fix(packets): ...
 
-This style will be followed for future commits.
+# Generated File Cleanup
+
+During repository inspection, the following file was identified:
+
+runtime/station.log
+
+This file is generated during application execution and is not source code.
+
+Generated files should not be tracked because they create unnecessary changes in Git.
+
+The cleanup process:
+
+1. Added runtime files to .gitignore.
+
+Example:
+
+runtime/
+
+2. Removed the file from Git tracking while keeping the local copy:
+
+git rm --cached runtime/station.log
+
+3. Committed the cleanup.
+
+Commit:
+
+chore(repo): ignore runtime logs and add repository notes
 
 ---
 
@@ -162,35 +185,67 @@ This command is useful for checking whether scripts have the correct executable 
 
 ---
 
-# Generated File Cleanup
+# Fixing launch.sh Executable Permission
 
-During repository inspection, the following file was identified:
+Problem:
 
-runtime/station.log
+The script:
 
-This file is generated during application execution and is not source code.
+scripts/launch.sh
 
-Generated files should not be tracked because they create unnecessary changes in Git.
+did not have the executable permission stored in Git.
 
-The cleanup process:
+Git showed the file mode as:
 
-1. Added runtime files to .gitignore.
+100644
 
-Example:
-
-runtime/
-
-2. Removed the file from Git tracking while keeping the local copy:
-
-git rm --cached runtime/station.log
-
-3. Committed the cleanup.
-
-Commit:
-
-chore(repo): ignore runtime logs and add repository notes
+which means the file was tracked as a normal file and could not be executed directly as a script.
 
 ---
+
+## Fix
+
+Command used:
+
+git update-index --chmod=+x scripts/launch.sh
+
+Explanation:
+
+- git update-index modifies the Git staging index.
+- --chmod=+x changes the executable permission bit stored by Git.
+- scripts/launch.sh specifies the file being modified.
+
+This does not change the file content. It only changes the permission metadata that Git tracks.
+
+After the fix, Git stores the file mode as:
+
+100755
+
+Meaning:
+- Owner: read, write, execute
+- Group: read, execute
+- Others: read, execute
+
+The script can now be treated as an executable file.
+
+---
+
+## Verification
+
+Command:
+
+git ls-files --stage scripts/launch.sh
+
+Before:
+
+100644 scripts/launch.sh
+
+After:
+
+100755 scripts/launch.sh
+
+The change was then committed so that the executable permission is preserved when others clone the repository.
+
 
 # Accidental Commit Recovery
 
