@@ -111,9 +111,20 @@ ApplicationWindow {
                         Layout.fillWidth: true
                         text: station.armed ? "Disable Drive Link" : "Enable Drive Link"
                         enabled: station.connected
-                        onClicked: station.toggleArm()
-                    }
-                    DrivePad { Layout.fillWidth: true }
+                        onClicked:  {
+        drivePad.clearKeyboardState()
+        station.toggleArm()
+
+        if (station.armed) {
+            Qt.callLater(function() {
+                drivePad.forceActiveFocus()
+            })
+        }
+    }
+}
+                    DrivePad { Layout.fillWidth: true
+                    id: drivePad
+                   }
                     Item { Layout.fillHeight: true }
                     Label {
                         text: "Watchdog: " + (station.telemetryData.failsafe ? "holding stop" : "receiving commands")
