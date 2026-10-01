@@ -3,7 +3,129 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 ColumnLayout {
+    id: drivePad
+
     spacing: 8
+    focus: true
+
+   
+    // ADDED: KEYBOARD TELEOP STATE
+   
+
+    property var pressedKeys: ({})
+
+    function isMovementKey(key) {
+        return key === Qt.Key_W ||
+               key === Qt.Key_A ||
+               key === Qt.Key_S ||
+               key === Qt.Key_D ||
+               key === Qt.Key_Up ||
+               key === Qt.Key_Left ||
+               key === Qt.Key_Down ||
+               key === Qt.Key_Right
+    }
+
+    function clearKeyboardState() {
+        pressedKeys = ({})
+        station.stop()
+    }
+
+    function updateKeyboardDrive() {
+        // W and Up are aliases.
+        // Holding both must still count as one forward input.
+        var forward =
+                pressedKeys[Qt.Key_W] ||
+                pressedKeys[Qt.Key_Up]
+
+        // S and Down are aliases.
+        var reverse =
+                pressedKeys[Qt.Key_S] ||
+                pressedKeys[Qt.Key_Down]
+
+        // A and Left are aliases.
+        var turnLeft =
+                pressedKeys[Qt.Key_A] ||
+                pressedKeys[Qt.Key_Left]
+
+        // D and Right are aliases.
+        var turnRight =
+                pressedKeys[Qt.Key_D] ||
+                pressedKeys[Qt.Key_Right]
+
+        // Opposing directions cancel.
+        var forwardAxis =
+                (forward ? 1 : 0) -
+                (reverse ? 1 : 0)
+
+        var turnAxis =
+                (turnRight ? 1 : 0) -
+                (turnLeft ? 1 : 0)
+
+        // Differential-drive mixing.
+        var leftCommand = forwardAxis + turnAxis
+        var rightCommand = forwardAxis - turnAxis
+
+        // Keep normalized wheel commands within [-1, 1].
+        leftCommand =
+                Math.max(-1, Math.min(1, leftCommand))
+
+        rightCommand =
+                Math.max(-1, Math.min(1, rightCommand))
+
+        if (leftCommand === 0 && rightCommand === 0) {
+            station.stop()
+        } else {
+            station.setDrive(leftCommand, rightCommand)
+        }
+    }
+
+    // Ignore Qt-generated auto-repeat events.
+    // Only the real initial press and real final release
+    // modify the remembered keyboard state.
+    Keys.onPressed: function(event) {
+        if (!isMovementKey(event.key))
+            return
+
+        if (event.isAutoRepeat) {
+            event.accepted = true
+            return
+        }
+
+        pressedKeys[event.key] = true
+        updateKeyboardDrive()
+
+        event.accepted = true
+    }
+
+    Keys.onReleased: function(event) {
+        if (!isMovementKey(event.key))
+            return
+
+        if (event.isAutoRepeat) {
+            event.accepted = true
+            return
+        }
+
+        delete pressedKeys[event.key]
+        updateKeyboardDrive()
+
+        event.accepted = true
+    }
+
+    // If keyboard focus leaves the drive pad,
+    // forget held movement keys and request stop.
+    //
+    // This also makes mouse interaction naturally take over
+    // without modifying the authority-provided mouse handlers.
+    onActiveFocusChanged: {
+        if (!activeFocus)
+            clearKeyboardState()
+    }
+
+    // =========================================================
+    // AUTHORITY-PROVIDED UI / MOUSE CONTROLS BELOW
+    // UNCHANGED
+    // =========================================================
 
     RowLayout {
         spacing: 6
@@ -125,7 +247,7 @@ ColumnLayout {
         border.width: 1
         Label {
             anchors.centerIn: parent
-            text: "[ TASK ] KEYBOARD TELEOP: AWAITING IMPLEMENTATION"
+            text: "KEYBOARD TELEOP: IMPLEMENTED"
             color: "#f3c623"
             font.pixelSize: 9
             font.bold: true
