@@ -57,14 +57,38 @@ ApplicationWindow {
             RowLayout {
                 spacing: 8
                 Rectangle {
-                    width: 8; height: 8; radius: 4
-                    color: station.connected ? "#00e676" : "#4a5568"
-                    Layout.alignment: Qt.AlignVCenter
+                            width: 8
+                            height: 8
+                            radius: 4
+
+                            color: station.linkState === "LIVE" ? "#00e676"
+                                : station.linkState === "WAITING" ? "#f3c623"
+                                : station.linkState === "STALE" ? "#e63946"
+                                : "#4a5568"
+
+                            Layout.alignment: Qt.AlignVCenter
                 }
                 ColumnLayout {
                     spacing: 1
-                    Label { text: station.connected ? "CONNECTED" : "DISCONNECTED"; color: station.connected ? "#00e676" : "#7a8b9e"; font.pixelSize: 11; font.bold: true; font.family: Qt.platform.os === "windows" ? "Consolas" : "monospace" }
-                    Label { text: station.endpoint; color: "#485b70"; font.family: Qt.platform.os === "windows" ? "Consolas" : "monospace"; font.pixelSize: 10 }
+                    Label {
+                    text: station.linkState
+
+                    color: station.linkState === "LIVE" ? "#00e676"
+                        : station.linkState === "WAITING" ? "#f3c623"
+                        : station.linkState === "STALE" ? "#e63946"
+                        : "#7a8b9e"
+
+                    font.pixelSize: 11
+                    font.bold: true
+                    font.family: Qt.platform.os === "windows" ? "Consolas" : "monospace"
+    }
+
+                    Label {
+                        text: station.endpoint
+                        color: "#485b70"
+                        font.family: Qt.platform.os === "windows" ? "Consolas" : "monospace"
+                        font.pixelSize: 10
+                    }
                 }
             }
 
@@ -78,10 +102,45 @@ ApplicationWindow {
 
         RowLayout {
             spacing: 12
-            Metric { Layout.fillWidth: true; metricIndex: 1; label: "BATTERY VOLTAGE"; value: station.telemetryData.battery.toFixed(2); unit: "V" }
-            Metric { Layout.fillWidth: true; metricIndex: 2; label: "ROVER HEADING"; value: (station.telemetryData.heading * 180 / Math.PI).toFixed(0); unit: "deg" }
-            Metric { Layout.fillWidth: true; metricIndex: 3; label: "LEFT WHEEL SPD"; value: station.telemetryData.left.toFixed(2); unit: "m/s" }
-            Metric { Layout.fillWidth: true; metricIndex: 4; label: "RIGHT WHEEL SPD"; value: station.telemetryData.right.toFixed(2); unit: "m/s" }
+           Metric {
+                Layout.fillWidth: true
+                metricIndex: 1
+                label: "BATTERY VOLTAGE"
+                value: station.linkState === "LIVE"
+                    ? station.telemetryData.battery.toFixed(2)
+                    : "--"
+                unit: station.linkState === "LIVE" ? "V" : ""
+            }
+
+            Metric {
+                Layout.fillWidth: true
+                metricIndex: 2
+                label: "ROVER HEADING"
+                value: station.linkState === "LIVE"
+                    ? (station.telemetryData.heading * 180 / Math.PI).toFixed(0)
+                    : "--"
+                unit: station.linkState === "LIVE" ? "deg" : ""
+            }
+
+            Metric {
+                Layout.fillWidth: true
+                metricIndex: 3
+                label: "LEFT WHEEL SPD"
+                value: station.linkState === "LIVE"
+                    ? station.telemetryData.left.toFixed(2)
+                    : "--"
+                unit: station.linkState === "LIVE" ? "m/s" : ""
+            }
+
+            Metric {
+                Layout.fillWidth: true
+                metricIndex: 4
+                label: "RIGHT WHEEL SPD"
+                value: station.linkState === "LIVE"
+                    ? station.telemetryData.right.toFixed(2)
+                    : "--"
+                unit: station.linkState === "LIVE" ? "m/s" : ""
+            }
         }
 
         RowLayout {
@@ -110,7 +169,7 @@ ApplicationWindow {
                         objectName: "armButton"
                         Layout.fillWidth: true
                         text: station.armed ? "Disable Drive Link" : "Enable Drive Link"
-                        enabled: station.connected
+                        enabled: station.linkState === "LIVE" 
                         onClicked:  {
         drivePad.clearKeyboardState()
         station.toggleArm()

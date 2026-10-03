@@ -39,6 +39,7 @@ class Station(QObject):
         self.note("Station ready. Start the simulator, then connect.")
 
     connected = Property(bool, lambda self: self._online, notify=changed)
+    linkState = Property(str, lambda self: self._link_state(), notify=changed)
     armed = Property(bool, lambda self: self._armed, notify=changed)
     telemetryData = Property("QVariantMap", lambda self: self.telemetry.values, notify=changed)
     eventLines = Property("QStringList", lambda self: self._events, notify=eventsChanged)
@@ -49,17 +50,34 @@ class Station(QObject):
     txBytes = Property(int, lambda self: self.link.tx, notify=changed)
     invalidPackets = Property(int, lambda self: self._invalid, notify=changed)
     endpoint = Property(str, lambda self: f"127.0.0.1:{self.config['rover_port']}", constant=True)
+    def _link_state(self):
+        if not self._online:
+            return "DISCONNECTED"
+
+        if self.telemetry.received_at is None:
+            return "WAITING"
+
+        age_ms = (time.monotonic() - self.telemetry.received_at) * 1000
+
+        if age_ms > self.config["stale_after_ms"]:
+            return "STALE"
+
+        return "LIVE"
 
     def note(self, message, warning=False):
         (log.warning if warning else log.info)(message)
         self._events = (self._events + [time.strftime("%H:%M:%S") + "  " + message])[-80:]
         self.eventsChanged.emit()
 
+
     @Slot()
     def connectLink(self):
         if self._online:
             return
         try:
+            self.telemetry.received_at = None
+            self.telemetry.sequence = None
+            #without this, after disconnect and reconnect, the timestamp from the previous session could make the new connection immediately appear stale instead of WAITING.
             self.link.open()
             self._online = True
             self.link.send(encode("hello", self._seq))
@@ -77,14 +95,18 @@ class Station(QObject):
         self._armed = False
         self.link.close()
         self._online = False
+        #clear freshness on disconnect
+        self.telemetry.received_at = None
+        self.telemetry.sequence = None
+
         self.note("Datalink closed")
         self.changed.emit()
 
     @Slot()
     def toggleArm(self):
-        if not self._online:
-            self.note("Connect before enabling drive", True)
-            return
+        if self._link_state() != "LIVE":
+            self.note("Live rover telemetry required before enabling drive", True)
+            return #socket open ≠ rover alive
         self.stop()
         self._armed = not self._armed
         self.note("Drive enabled" if self._armed else "Drive disabled")
@@ -150,7 +172,13 @@ class Station(QObject):
                         self.note("First rover telemetry received")
             if self._armed:
                 self._send_drive()
-        self.changed.emit()
+            if self._online and self._link_state() == "STALE":
+                if self._armed or self._left != 0.0 or self._right != 0.0:
+                    self._left = self._right = 0.0
+                    self._armed = False
+                    self._send_drive()
+                    self.note("Telemetry stale; drive disabled", True)#stale safety handling inside tick()
+            self.changed.emit()
 
     @Slot()
     def clearEvents(self):
